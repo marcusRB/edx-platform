@@ -28,6 +28,7 @@ import logging
 import os.path
 import time
 
+from argparse import ArgumentTypeError
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connections
@@ -44,6 +45,15 @@ LOGGER = logging.getLogger(__name__)
 
 def chunks(sequence, chunk_size):
     return (sequence[index: index + chunk_size] for index in xrange(0, len(sequence), chunk_size))
+
+
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise ArgumentTypeError('Boolean value expected.')
 
 
 class Command(BaseCommand):
@@ -69,6 +79,13 @@ class Command(BaseCommand):
                             dest='email_optin_chunk_size',
                             metavar='CHUNK_SIZE',
                             help='Number of courses for which to get opt-in information in a single query.')
+        parser.add_argument('--lookup_course_list',
+                            type=str2bool,
+                            nargs='?',
+                            const=True, #default=NICE,
+                            metavar='LOOKUP_COURSE_LIST',
+                            help='Look up courses associated with the specified org(s). Leave this flag off or set to '
+                                 'True to maintain historical behavior.')
 
     # Fields output in the CSV
     OUTPUT_FIELD_NAMES = [
@@ -109,22 +126,32 @@ class Command(BaseCommand):
         if os.path.exists(file_path):
             raise CommandError("File already exists at '{path}'".format(path=file_path))
 
-        # Retrieve all the courses for the org.
-        # If we were given a specific list of courses to include,
-        # filter out anything not in that list.
-        courses = self._get_courses_for_org(org_list)
-        only_courses = options.get("courses")
+        # Requesting the course list can get prohibitively expensive depending on the platform installation.  Lets put
+        # in a circumvention if the caller knows they are specifying the full course list.
+        lookup_course_list = options.get("lookup_course_list")
 
-        if only_courses is not None:
-            only_courses = [
-                CourseKey.from_string(course_key.strip())
-                for course_key in only_courses.split(",")
-            ]
-            courses = list(set(courses) & set(only_courses))
+        if lookup_course_list or lookup_course_list is None:
+            # Retrieve all the courses for the org.
+            # If we were given a specific list of courses to include,
+            # filter out anything not in that list.
+            courses = self._get_courses_for_org(org_list)
+            only_courses = options.get("courses")
 
-        # Add in organizations from the course keys, to ensure
-        # we're including orgs with different capitalizations
-        org_list = list(set(org_list) | set(course.org for course in courses))
+            # This appears to filter out courses specified that are not part of the organizations specified
+            if only_courses is not None:
+                only_courses = [
+                    CourseKey.from_string(course_key.strip())
+                    for course_key in only_courses.split(",")
+                ]
+                courses = list(set(courses) & set(only_courses))
+
+            # Add in organizations from the course keys, to ensure
+            # we're including orgs with different capitalizations
+            # The current implementation used in _write_email_opt_in_prefs is case insensitive when matching on Org name
+            org_list = list(set(org_list) | set(course.org for course in courses))
+        else:
+            courses = list(set(options.get("courses").split(",")))
+
 
         # If no courses are found, abort
         if not courses:
@@ -264,7 +291,7 @@ class Command(BaseCommand):
             row_count += 1
 
         # Log the number of rows we processed
-        LOGGER.info("Retrieved {num_rows} records.".format(num_rows=row_count))
+        LOGGER.info("Retrieved {num_rows} records for orgs {org}.".format(num_rows=row_count, org=org_aliases))
 
     def _iterate_results(self, cursor):
         """
