@@ -2,6 +2,8 @@
 Acceptance tests for course creation.
 """
 import uuid
+import random
+import string
 
 from nose.plugins.attrib import attr
 
@@ -143,4 +145,65 @@ class CreateCourseTest(AcceptanceTest):
         self.dashboard_page.visit()
         self.assertTrue(self.dashboard_page.has_course(
             org=new_org, number=self.course_number, run=self.course_run
+        ))
+
+    def test_error_appears_with_long_tuple(self):
+        """
+        Scenario: Ensure that the course creation is not successful with 66 characters long tuple.
+        Given I have filled course creation from with combined length of 66 characters for Organization, course Number
+        and course Run.
+        And I have a valid course name
+        Then form validation should not pass
+        And I see error for combined length longer than 65
+        """
+        course_org = "012345678901234567890123456789"
+        course_number = "012345678901234567890123456789"
+        course_run = "0123456"
+        self.auth_page.visit()
+        self.dashboard_page.visit()
+        self.assertTrue(self.dashboard_page.new_course_button.present)
+        self.dashboard_page.click_new_course_button()
+        self.assertTrue(self.dashboard_page.is_new_course_form_visible())
+        self.dashboard_page.fill_new_course_form(
+            self.course_name, course_org, course_number, course_run
+        )
+        self.assertEqual(
+            self.dashboard_page.get_length_error_text(),
+            'The combined length of the organization, course number, and course run fields cannot be more than 65 '
+            'characters.'
+        )
+
+    def test_no_error_appears_for_long_course_name(self):
+        """
+        Scenario: Ensure that the course creation with 66 characters long course name is successful.
+        Given I have filled course creation form with 66 characters long course name.
+        And I have filled remaining form within the allowed characters length.
+        When I click 'Create' button
+        Form validation should pass
+        Then I see the course listing page with newly created course
+        """
+        course_name = ''.join(random.choice(string.ascii_uppercase) for _ in range(66))
+        self.auth_page.visit()
+        self.dashboard_page.visit()
+        self.assertFalse(self.dashboard_page.has_course(
+            org=self.course_org, number=self.course_number, run=self.course_run
+        ))
+        self.dashboard_page.click_new_course_button()
+        self.assertTrue(self.dashboard_page.is_new_course_form_visible())
+        self.dashboard_page.fill_new_course_form(
+            course_name, self.course_org, self.course_number, self.course_run
+        )
+        self.dashboard_page.submit_new_course_form()
+        # Successful creation of course takes user to course outline page
+        course_outline_page = CourseOutlinePage(
+            self.browser,
+            self.course_org,
+            self.course_number,
+            self.course_run
+        )
+        course_outline_page.visit()
+        course_outline_page.wait_for_page()
+        self.dashboard_page.visit()
+        self.assertTrue(self.dashboard_page.has_course(
+            org=self.course_org, number=self.course_number, run=self.course_run
         ))
