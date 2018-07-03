@@ -138,8 +138,8 @@ class SystemTestSuite(PytestSuite):
         elif self.verbosity > 1:
             cmd.append("--verbose")
 
-        if self.disable_capture:
-            cmd.append("-s")
+        # if self.disable_capture:
+        #     cmd.append("-s")
 
         # if self.processes == -1:
         #     cmd.append('-n auto')
@@ -150,19 +150,18 @@ class SystemTestSuite(PytestSuite):
         #
         # if not self.randomize:
         #     cmd.append('-p no:randomly')
-        #if self.eval_attr:
+        # if self.eval_attr:
         #    cmd.append("-a '{}'".format(self.eval_attr))
 
         cmd.extend(self.passthrough_options)
         #cmd.append(self.test_id)
 
-        cmd.append('openedx/features')
+        cmd.append('lms/djangoapps/courseware')
         cmd.append('-d')
-        ip_addresses = ['10.11.10.26']
+        ip_addresses = ['10.11.10.76']
         for ip in ip_addresses:
-            cmd.append('--tx ssh=ubuntu@{}//python="source /edx/app/edxapp/edxapp_env; python"//chdir=/home/ubuntu/edx-platform'.format(ip))
-        #cmd.append('--rsyncdir openedx/features')
-        #cmd.append('--rsyncignore tmp*')
+            cmd.append('--tx ssh=ubuntu@{}//python="source /edx/app/edxapp/edxapp_env; python"//chdir="/home/ubuntu/edx-platform"'.format(ip))
+        cmd.append('--rsyncdir lms/djangoapps/courseware')
         print(cmd)
 
         return self._under_coverage_cmd(cmd)
@@ -249,7 +248,7 @@ class LibTestSuite(PytestSuite):
         cmd.append('openedx/features')
         cmd.append('-d')
         cmd.append('--tx ssh=ubuntu@10.11.10.25//chdir=/edx/app/edxapp/edx-platform')
-        cmd.append('--rsyncdir /edx/app/edxapp/edx-platform /edx/app/edxapp/edx-platform')
+        #cmd.append('--rsyncdir /edx/app/edxapp/edx-platform /edx/app/edxapp/edx-platform')
 
         print(cmd)
 
