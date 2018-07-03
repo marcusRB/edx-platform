@@ -111,6 +111,7 @@ class SystemTestSuite(PytestSuite):
         self.processes = kwargs.get('processes', None)
         self.randomize = kwargs.get('randomize', None)
         self.settings = kwargs.get('settings', Env.TEST_SETTINGS)
+        self.xdist_ip_addresses = kwargs.get('xdist_ip_addresses', None)
 
         if self.processes is None:
             # Don't use multiprocessing by default
@@ -138,31 +139,34 @@ class SystemTestSuite(PytestSuite):
         elif self.verbosity > 1:
             cmd.append("--verbose")
 
-        # if self.disable_capture:
-        #     cmd.append("-s")
+        if self.disable_capture:
+            cmd.append("-s")
 
-        # if self.processes == -1:
-        #     cmd.append('-n auto')
-        #     cmd.append('--dist=loadscope')
-        # elif self.processes != 0:
-        #     cmd.append('-n {}'.format(self.processes))
-        #     cmd.append('--dist=loadscope')
-        #
-        # if not self.randomize:
-        #     cmd.append('-p no:randomly')
-        # if self.eval_attr:
-        #    cmd.append("-a '{}'".format(self.eval_attr))
+        if self.xdist_ip_addresses:
+            cmd.append('-d')
+            for ip in self.xdist_ip_addresses:
+                cmd.append('--tx ssh=ubuntu@{}//python="source /edx/app/edxapp/edxapp_env; python"//chdir="/edx/app/edxapp/edx-platform"'.format(ip))
+            already_synced_dirs = []
+            for id in self.test_id.split():
+                test_root_dir = id.split('/')[0]
+                if test_root_dir not in already_synced_dirs:
+                    cmd.append('--rsyncdir {}'.format(test_root_dir))
+                    already_synced_dirs.append(test_root_dir)
+        else:
+            if self.processes == -1:
+                cmd.append('-n auto')
+                cmd.append('--dist=loadscope')
+            elif self.processes != 0:
+                cmd.append('-n {}'.format(self.processes))
+                cmd.append('--dist=loadscope')
+
+            if not self.randomize:
+                cmd.append('-p no:randomly')
+            if self.eval_attr:
+               cmd.append("-a '{}'".format(self.eval_attr))
 
         cmd.extend(self.passthrough_options)
-        #cmd.append(self.test_id)
-
-        cmd.append('lms/djangoapps/courseware')
-        cmd.append('-d')
-        ip_addresses = ['10.11.10.76']
-        for ip in ip_addresses:
-            cmd.append('--tx ssh=ubuntu@{}//python="source /edx/app/edxapp/edxapp_env; python"//chdir="/home/ubuntu/edx-platform"'.format(ip))
-        cmd.append('--rsyncdir lms/djangoapps/courseware')
-        print(cmd)
+        cmd.append(self.test_id)
 
         return self._under_coverage_cmd(cmd)
 
@@ -219,6 +223,7 @@ class LibTestSuite(PytestSuite):
         self.append_coverage = kwargs.get('append_coverage', False)
         self.test_id = kwargs.get('test_id', self.root)
         self.eval_attr = kwargs.get('eval_attr', None)
+        self.xdist_ip_addresses = kwargs.get('xdist_ip_addresses', None)
 
     @property
     def cmd(self):
@@ -242,15 +247,22 @@ class LibTestSuite(PytestSuite):
             cmd.append("--verbose")
         if self.disable_capture:
             cmd.append("-s")
-        if self.eval_attr:
-            cmd.append("-a '{}'".format(self.eval_attr))
-        #cmd.append(self.test_id)
-        cmd.append('openedx/features')
-        cmd.append('-d')
-        cmd.append('--tx ssh=ubuntu@10.11.10.25//chdir=/edx/app/edxapp/edx-platform')
-        #cmd.append('--rsyncdir /edx/app/edxapp/edx-platform /edx/app/edxapp/edx-platform')
 
-        print(cmd)
+        if self.xdist_ip_addresses:
+            cmd.append('-d')
+            for ip in self.xdist_ip_addresses:
+                cmd.append('--tx ssh=ubuntu@{}//python="source /edx/app/edxapp/edxapp_env; python"//chdir="/edx/app/edxapp/edx-platform"'.format(ip))
+            already_synced_dirs = []
+            for id in self.test_id.split():
+                test_root_dir = id.split('/')[0]
+                if test_root_dir not in already_synced_dirs:
+                    cmd.append('--rsyncdir {}'.format(test_root_dir))
+                    already_synced_dirs.append(test_root_dir)
+        else:
+            if self.eval_attr:
+                cmd.append("-a '{}'".format(self.eval_attr))
+
+        cmd.append(self.test_id)
 
         return self._under_coverage_cmd(cmd)
 
