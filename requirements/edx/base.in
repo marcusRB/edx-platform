@@ -74,6 +74,7 @@ edx-drf-extensions
 edx-django-oauth2-provider==1.2.5
 edx-django-sites-extensions==2.3.1
 edx-enterprise
+edx-i18n-tools
 edx-milestones
 edx-oauth2-provider
 edx-organizations
